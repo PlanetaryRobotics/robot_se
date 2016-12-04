@@ -100,18 +100,6 @@ void se_predict(double delta, int idx)
 {
     int i,j;
 
-    /*
-    printf("%d, x_k-1+,", idx);
-    for (i=0 ; i<N_STATE ; i++)
-        printf("%g,", p_ekf->fx[i]);
-    printf("\n");
-    printf("%d, p_k-1+,", idx);
-    for (i=0 ; i<N_STATE ; i++)
-        for (j=0 ; j<N_STATE ; j++)
-            printf("%g,", p_ekf->P[i][j]);
-    printf("\n");
-    */
-
     double sp = sin(p_ekf->x[pitch]);
     double cp = cos(p_ekf->x[pitch]);
     double sr = sin(p_ekf->x[roll]);
@@ -244,26 +232,6 @@ void se_predict(double delta, int idx)
     p_ekf->fx[yaw] = wrapRotation(p_ekf->fx[yaw]);
     //TODO Apply control here. KR
 
-    /*
-    printf("%d, x_k-,", idx);
-    for (i=0 ; i<N_STATE ; i++)
-        printf("%g,", p_ekf->x[i]);
-    printf("\n");
-    printf("%d, q_k-,", idx);
-    for (i=0 ; i<N_STATE ; i++)
-        for (j=0 ; j<N_STATE ; j++)
-            printf("%g,", p_ekf->Q[i][j]);
-    printf("\n");
-    printf("%d, p_k-,", idx);
-    for (i=0 ; i<N_STATE ; i++)
-        for (j=0 ; j<N_STATE ; j++)
-            printf("%g,", p_ekf->P[i][j]);
-    printf("\n");
-    printf("%d, fx_k-,", idx);
-    for (i=0 ; i<N_STATE ; i++)
-        printf("%g,", p_ekf->fx[i]);
-    printf("\n");
-    */
 }
 
 void se_update(double* msmt, int* msmt_up, int num_up,  double* msmt_covariance, int idx)
@@ -306,23 +274,6 @@ void se_update(double* msmt, int* msmt_up, int num_up,  double* msmt_covariance,
   	        p_ekf->R[i][j] = 1e-9;
  	}
     }
-
-    /*
-    printf("%d, z_k-,", idx);
-    for (i=0 ; i<N_MSMT ; i++)
-        printf("%g,", z[i]);
-    printf("\n");
-    printf("%d, r_k-,", idx);
-    for (i=0 ; i<N_MSMT ; i++)
-        for (j=0 ; j<N_STATE ; j++)
-            printf("%g,", p_ekf->R[i][j]);
-    printf("\n");
-    printf("%d, H_k-,", idx);
-    for (i=0 ; i<N_MSMT ; i++)
-        for (j=0 ; j<N_STATE ; j++)
-            printf("%g,", p_ekf->H[i][j]);
-    printf("\n");
-    */
 
     // update
     ekf_step(p_ekf, z, idx);
