@@ -7,30 +7,30 @@
 #include "vecmat_utils.h"
 #include "se_model.h"
 
-void se_init(ekf_t* p_ekf)
-{
-    if (p_ekf == NULL)
-        return;
+ekf_t ekf;
+ekf_t* p_ekf = &ekf;
 
-    ekf_init(p_ekf, N, M);
+ekf_t* se_init()
+{
+    ekf_init(p_ekf, N_STATE, N_MSMT);
     
     int i, j;
 
-    for (i=0; i<N; ++i)
+    for (i=0; i<N_STATE; ++i)
         p_ekf->x[i] = 0;
 
-    for (i=0; i<N; ++i)
-        for (j=0; i<N; ++i)
+    for (i=0; i<N_STATE; ++i)
+        for (j=0; i<N_STATE; ++i)
             p_ekf->F[i][j] = 0;
 
-    for (i=0; i<N; ++i)
+    for (i=0; i<N_STATE; ++i)
         p_ekf->A[i][i] = 1;
     
-    for (i = 0 ; i < M ; i++)
+    for (i = 0 ; i < N_MSMT ; i++)
         p_ekf->C[i][i] = 1;     
 
-    for (i=0; i<N; ++i)
-        for (j=0; i<N; ++i)
+    for (i=0; i<N_STATE; ++i)
+        for (j=0; i<N_STATE; ++i)
             p_ekf->Q[i][j] = 0;
 
     p_ekf->Q[0][0] = .05;
@@ -49,18 +49,23 @@ void se_init(ekf_t* p_ekf)
     p_ekf->Q[13][13] = .01;
     p_ekf->Q[14][14] = .015;
 
-    for (i=0; i<N; ++i)
+    for (i=0; i<N_STATE; ++i)
         p_ekf->P[i][i] = 1e-9;
 
-    for (i=0; i<M; ++i)
+    for (i=0; i<N_MSMT; ++i)
         p_ekf->hx[i] = 0;
 
-    for (i=0; i<M; ++i)
+    for (i=0; i<N_MSMT; ++i)
         p_ekf->R[i][i] = .01;
 
-    for (i=0; i<N; ++i)
+    for (i=0; i<N_STATE; ++i)
         p_ekf->H[i][i] = 1;      
 
+    // Msmts are already in the form of state variables. So C is just unity
+    for (i = 0 ; i < N_MSMT ; i++)
+        p_ekf->C[i][i] = 1;     
+
+    return p_ekf;
 }
 
 const double PI = 3.1415926;
@@ -84,17 +89,28 @@ static double wrapRotation(double rotation)
     }
 }
 
-static void constrainStateAngles(ekf_t* p_ekf)
+static void constrainStateAngles()
 {
     p_ekf->x[roll] = wrapRotation(p_ekf->x[roll]);
     p_ekf->x[pitch] = wrapRotation(p_ekf->x[pitch]);
     p_ekf->x[yaw] = wrapRotation(p_ekf->x[yaw]);
 }
 
-void se_predict(double delta, ekf_t* p_ekf)
+void se_predict(double delta, int idx)
 {
-    if (p_ekf == NULL)
-        return;
+    int i,j;
+
+    /*
+    printf("%d, x_k-1+,", idx);
+    for (i=0 ; i<N_STATE ; i++)
+        printf("%g,", p_ekf->fx[i]);
+    printf("\n");
+    printf("%d, p_k-1+,", idx);
+    for (i=0 ; i<N_STATE ; i++)
+        for (j=0 ; j<N_STATE ; j++)
+            printf("%g,", p_ekf->P[i][j]);
+    printf("\n");
+    */
 
     double sp = sin(p_ekf->x[pitch]);
     double cp = cos(p_ekf->x[pitch]);
@@ -193,7 +209,6 @@ void se_predict(double delta, ekf_t* p_ekf)
     double dFz_dR = (ycoeff * p_ekf->x[vy] + zcoeff * p_ekf->x[vz]) * delta +
                     (ycoeff * p_ekf->x[ay] + zcoeff * p_ekf->x[az]) * sqrby2;
     double dFY_dR = (ycoeff * p_ekf->x[vpitch] + zcoeff * p_ekf->x[vyaw]) * delta;
-
     xcoeff = -cp;
     ycoeff = -sp * sr;
     zcoeff = -sp * cr;
@@ -201,9 +216,8 @@ void se_predict(double delta, ekf_t* p_ekf)
                     (xcoeff * p_ekf->x[ax] + ycoeff * p_ekf->x[ay] + zcoeff * p_ekf->x[az]) * sqrby2;
     double dFY_dP = (xcoeff * p_ekf->x[vroll] + ycoeff * p_ekf->x[vpitch] + zcoeff * p_ekf->x[vyaw]) * delta;
 
-    int i,j;
-    for (i=0 ; i<N ; i++)
-        for (j=0 ; j<N ; j++)
+    for (i=0 ; i<N_STATE ; i++)
+        for (j=0 ; j<N_STATE ; j++)
             p_ekf->F[i][j] = p_ekf->A[i][j];
     	     
     p_ekf->F[x][roll] = dFx_dR;
@@ -228,31 +242,44 @@ void se_predict(double delta, ekf_t* p_ekf)
     p_ekf->fx[roll] = wrapRotation(p_ekf->fx[roll]);
     p_ekf->fx[pitch] = wrapRotation(p_ekf->fx[pitch]);
     p_ekf->fx[yaw] = wrapRotation(p_ekf->fx[yaw]);
-
     //TODO Apply control here. KR
+
+    /*
+    printf("%d, x_k-,", idx);
+    for (i=0 ; i<N_STATE ; i++)
+        printf("%g,", p_ekf->x[i]);
+    printf("\n");
+    printf("%d, q_k-,", idx);
+    for (i=0 ; i<N_STATE ; i++)
+        for (j=0 ; j<N_STATE ; j++)
+            printf("%g,", p_ekf->Q[i][j]);
+    printf("\n");
+    printf("%d, p_k-,", idx);
+    for (i=0 ; i<N_STATE ; i++)
+        for (j=0 ; j<N_STATE ; j++)
+            printf("%g,", p_ekf->P[i][j]);
+    printf("\n");
+    printf("%d, fx_k-,", idx);
+    for (i=0 ; i<N_STATE ; i++)
+        printf("%g,", p_ekf->fx[i]);
+    printf("\n");
+    */
 }
 
-void se_update(double* msmt, int* msmt_up, int num_up,  double* msmt_covariance, ekf_t* p_ekf, int idx)
+void se_update(double* msmt, int* msmt_up, int num_up,  double* msmt_covariance, int idx)
 {
-    if (p_ekf == NULL)
-        return;
-
-    int i;
-
-    // Measurements are already in the form of state variables. So C is just unity
-    for (i = 0 ; i < M ; i++)
-        p_ekf->C[i][i] = 1;     
+  int i,j;
 
     // msmt
-    double z[M];
-    for (i = 0 ; i < M ; i++)
+    double z[N_MSMT];
+    for (i = 0 ; i < N_MSMT ; i++)
         z[i] = msmt[i];     
   
     // H , msmt jacobian            
-    for (i = 0 ; i < M ; i++)
+    for (i = 0 ; i < N_MSMT ; i++)
     {
         int j;
-        for (j = 0 ; j < N ; j++)
+        for (j = 0 ; j < N_STATE ; j++)
 	{   // TODO  what if z is indeed 0 ??? needs fix. KR
 	    p_ekf->H[i][j] = 0;
 	}
@@ -267,39 +294,43 @@ void se_update(double* msmt, int* msmt_up, int num_up,  double* msmt_covariance,
 
     // msmt covariance
     int cnt = 0;
-    for (i = 0 ; i < M ; i++)
+    for (i = 0 ; i < N_MSMT ; i++)
     {
         int j;
-        for (j = 0 ; j < N ; j++)
+        for (j = 0 ; j < N_STATE ; j++)
 	{
   	    p_ekf->R[i][j] = msmt_covariance[cnt++];
             if ((i == j) && (p_ekf->R[i][j] < 0))    // Variance negative
 	        p_ekf->R[i][j] = abs(p_ekf->R[i][j]);            
             if ((i == j) && (p_ekf->R[i][j] < 1e-9)) // Variance too small
   	        p_ekf->R[i][j] = 1e-9;
-	}
+ 	}
     }
+
+    /*
+    printf("%d, z_k-,", idx);
+    for (i=0 ; i<N_MSMT ; i++)
+        printf("%g,", z[i]);
+    printf("\n");
+    printf("%d, r_k-,", idx);
+    for (i=0 ; i<N_MSMT ; i++)
+        for (j=0 ; j<N_STATE ; j++)
+            printf("%g,", p_ekf->R[i][j]);
+    printf("\n");
+    printf("%d, H_k-,", idx);
+    for (i=0 ; i<N_MSMT ; i++)
+        for (j=0 ; j<N_STATE ; j++)
+            printf("%g,", p_ekf->H[i][j]);
+    printf("\n");
+    */
 
     // update
     ekf_step(p_ekf, z, idx);
 
     // constraint angles
     constrainStateAngles(p_ekf);    
-}
 
-/*int tokenize_l(char str[], double out[])
-{  
-    const char delim[2] = ",";            
-    int num_tokens = 0;
-    
-    char* token = strtok(str, delim);       
-    while(token != NULL) 
-    {
-        out[num_tokens++] = atof(token);
-        token = strtok(NULL, delim); 
-    }
-    return num_tokens;
- }*/
+}
 
 
 

@@ -7,21 +7,15 @@
 
 #include "se_model.h"
 
+ekf_t* p_ekf;
+
 // Initialize se
-static void test_init(ekf_t* p_ekf)
+static void test_init()
 {
-    se_init(p_ekf);
-
-    int i, j;
-    for (i=0; i<N; ++i)
-        for (j=0; i<N; ++i)
-            p_ekf->F[i][j] = 0;
-
-    for (i=0; i<N; ++i)
-        p_ekf->A[i][i] = 1;    
+    p_ekf = se_init();
 }
 
-static void print_state(float idx, const ekf_t* p_ekf, const char* prefix, int x_or_fx, int p_or_pp, double delta, FILE* p_fout)
+static void print_state(float idx, const char* prefix, int x_or_fx, int p_or_pp, double delta, FILE* p_fout)
 {
     int i, j;
       
@@ -57,7 +51,7 @@ static void print_state(float idx, const ekf_t* p_ekf, const char* prefix, int x
     fprintf(p_fout, "d_%s_%g,%g\n", prefix, idx, delta); 
 }
 
-static void print_msmt(float idx, const ekf_t* p_ekf, const char* prefix, double* msmt, FILE* p_fout)
+static void print_msmt(float idx, const char* prefix, double* msmt, FILE* p_fout)
 {
     fprintf(p_fout, "m_%s_%g,", prefix, idx); 
     int i;
@@ -97,9 +91,9 @@ static int read_tokens(char* line, double* p_data, float p_tok_info[2])
     return num;
 }
 
-static void test_predict(ekf_t* p_ekf, const char* inp, const char* out)
+static void test_predict(const char* inp, const char* out)
 {
-    test_init(p_ekf);
+    test_init();
 
     FILE* p_finp = fopen(inp, "r");        
     if (p_finp == NULL)
@@ -161,17 +155,17 @@ static void test_predict(ekf_t* p_ekf, const char* inp, const char* out)
         assert(num_d == 1);    
 
 	// predict 
-	print_state(p_tok_info[1], p_ekf, "k-1+", 1, 1, d[0], p_fout);
-        se_predict(d[0], p_ekf);   
-        print_state(p_tok_info[1], p_ekf, "k-", 0, 0, d[0], p_fout);
+	print_state(p_tok_info[1],  "k-1+", 1, 1, d[0], p_fout);
+        se_predict(d[0], (int)p_tok_info[1]);   
+        print_state(p_tok_info[1],  "k-", 0, 0, d[0], p_fout);
     }     
     fclose(p_finp);
     fclose(p_fout);
 }
 
-static void test_update(ekf_t* p_ekf, const char* inp, const char* out)
+static void test_update( const char* inp, const char* out)
 {
-    test_init(p_ekf);
+    test_init();
 
     FILE* p_finp = fopen(inp, "r");        
     if (p_finp == NULL)
@@ -252,19 +246,19 @@ static void test_update(ekf_t* p_ekf, const char* inp, const char* out)
         assert(num_r == 225);    
 
 	// Print state before measurement
-	print_state(p_tok_info[1], p_ekf, "k-", 0, 0, d[0], p_fout);
-        se_update(z, zu, num_zu, r, p_ekf, (int)p_tok_info[1]);   
-        print_msmt(p_tok_info[1], p_ekf, "k-", z, p_fout);
-        print_state(p_tok_info[1], p_ekf, "k+", 1, 1, d[0], p_fout);
-        print_msmt(p_tok_info[1], p_ekf, "k+", z, p_fout);
+	print_state(p_tok_info[1], "k-", 0, 0, d[0], p_fout);
+        se_update(z, zu, num_zu, r, (int)p_tok_info[1]);   
+        print_msmt(p_tok_info[1], "k-", z, p_fout);
+        print_state(p_tok_info[1], "k+", 1, 1, d[0], p_fout);
+        print_msmt(p_tok_info[1], "k+", z, p_fout);
     }     
     fclose(p_finp);
     fclose(p_fout);
 }
 
-static void test_predict_update(ekf_t* p_ekf, const char* inp, const char* out)
+static void test_predict_update(const char* inp, const char* out)
 {
-    test_init(p_ekf);
+    test_init();
     FILE* p_finp = fopen(inp, "r");
     if (p_finp == NULL)
     {
@@ -290,12 +284,14 @@ static void test_predict_update(ekf_t* p_ekf, const char* inp, const char* out)
 
         int num_t = read_tokens(line, prev, p_tok_info);
 	assert (num_t <= 15);
+        if (((int)p_tok_info[1]) > 380)
+            return;
         switch ((int)p_tok_info[0])
 	{
 	case 0: // predict
-  	    print_state(p_tok_info[1], p_ekf, "k-1+", 1, 1, prev[0], p_fout);
-            se_predict(prev[0], p_ekf);   
-            print_state(p_tok_info[1], p_ekf, "k-", 0, 0, prev[0], p_fout);
+  	    print_state(p_tok_info[1],  "k-1+", 1, 1, prev[0], p_fout);
+            se_predict(prev[0], (int)p_tok_info[1]);   
+            print_state(p_tok_info[1],  "k-", 0, 0, prev[0], p_fout);
 	    break;
         case 1: // update
             getline(&line, &size, p_finp);
@@ -310,9 +306,9 @@ static void test_predict_update(ekf_t* p_ekf, const char* inp, const char* out)
             int num_r = read_tokens(line, next, p_tok_info);
 	    assert (num_r == 225);
 
-            se_update(prev, zu, num_zu, next,  p_ekf, (int)p_tok_info[1]);   
-            print_msmt(p_tok_info[1], p_ekf, "k-", prev, p_fout);
-            print_state(p_tok_info[1], p_ekf, "k+", 0, 0, prev[0], p_fout);
+            se_update(prev, zu, num_zu, next,  (int)p_tok_info[1]);   
+            print_msmt(p_tok_info[1],  "k-", prev, p_fout);
+            print_state(p_tok_info[1],  "k+", 1, 1, prev[0], p_fout);
             break;
         default: // error
   	    printf ("Input .. [BAD]");      
@@ -323,22 +319,19 @@ static void test_predict_update(ekf_t* p_ekf, const char* inp, const char* out)
 
 int main()
 {
-    printf("Generating predict test output ... ");
+  /*    printf("Generating predict test output ... ");
     fflush(stdout);
-    ekf_t ekf_predict;
-    test_predict(&ekf_predict, "./data/out_predict_test.txt", "./data/out_se_predict.txt");  
+    test_predict("./data/out_predict_test.txt", "./data/out_se_predict.txt");  
     printf("[OK]\n");
 
     printf("Generating update test output ... ");
     fflush(stdout);
-    ekf_t ekf_update;
-    test_update(&ekf_update, "./data/out_update_test.txt", "./data/out_se_update.txt");  
+    test_update("./data/out_update_test.txt", "./data/out_se_update.txt");  
     printf("[OK]\n");
-
+  */
     printf("Generating predict-update test output ... "); 
     fflush(stdout);
-    ekf_t ekf;
-    test_predict_update(&ekf, "./data/out_compact_test.txt", "./data/out_se.txt");  
+    test_predict_update("./data/out_compact_test.txt", "./data/out_se.txt");  
     printf("[OK]\n");
 
     return 0;

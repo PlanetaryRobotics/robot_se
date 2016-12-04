@@ -20,14 +20,14 @@ typedef enum
     az
 } state ;
 
-#define N 15 
-#define M 15
+#define N_STATE 15 
+#define N_MSMT 15
 
 #include "tiny_ekf_struct.h"
 #include "tiny_ekf.h"
 
-void se_init();
-void se_predict(double delta, ekf_t* p_ekf);
-void se_update(double* msmt, int* msmt_up, int num_up, double* msmt_covariance,  ekf_t* p_ekf, int idx);
+ekf_t* se_init();
+void se_predict(double delta, int idx);
+void se_update(double* msmt, int* msmt_up, int num_up, double* msmt_covariance,  int idx);
 
 #endif // _RL_MODEL_H_
