@@ -7,11 +7,12 @@
 #include "vecmat_utils.h"
 #include "se_model.h"
 
-ekf_t ekf;
-ekf_t* p_ekf = &ekf;
+static ekf_t* p_ekf = NULL;
 
 ekf_t* se_init()
 {
+    p_ekf = malloc(sizeof(ekf_t));
+
     ekf_init(p_ekf, N_STATE, N_MSMT);
     
     int i, j;
@@ -66,6 +67,12 @@ ekf_t* se_init()
         p_ekf->C[i][i] = 1;     
 
     return p_ekf;
+}
+
+void se_deinit()
+{
+    if (p_ekf != NULL)
+        free(p_ekf);
 }
 
 const double PI = 3.1415926;

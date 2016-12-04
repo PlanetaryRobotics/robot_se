@@ -15,6 +15,11 @@ static void test_init()
     p_ekf = se_init();
 }
 
+static void test_deinit()
+{
+    se_deinit();
+}
+
 static void print_state(float idx, const char* prefix, int x_or_fx, int p_or_pp, double delta, FILE* p_fout)
 {
     int i, j;
@@ -161,6 +166,8 @@ static void test_predict(const char* inp, const char* out)
     }     
     fclose(p_finp);
     fclose(p_fout);
+
+    test_deinit();
 }
 
 static void test_update( const char* inp, const char* out)
@@ -254,6 +261,8 @@ static void test_update( const char* inp, const char* out)
     }     
     fclose(p_finp);
     fclose(p_fout);
+
+    test_deinit();
 }
 
 static void test_predict_update(const char* inp, const char* out)
@@ -284,8 +293,6 @@ static void test_predict_update(const char* inp, const char* out)
 
         int num_t = read_tokens(line, prev, p_tok_info);
 	assert (num_t <= 15);
-        if (((int)p_tok_info[1]) > 380)
-            return;
         switch ((int)p_tok_info[0])
 	{
 	case 0: // predict
@@ -314,12 +321,13 @@ static void test_predict_update(const char* inp, const char* out)
   	    printf ("Input .. [BAD]");      
 	} 
     }
+    test_deinit();
 }
 
 
 int main()
 {
-  /*    printf("Generating predict test output ... ");
+    printf("Generating predict test output ... ");
     fflush(stdout);
     test_predict("./data/out_predict_test.txt", "./data/out_se_predict.txt");  
     printf("[OK]\n");
@@ -328,7 +336,7 @@ int main()
     fflush(stdout);
     test_update("./data/out_update_test.txt", "./data/out_se_update.txt");  
     printf("[OK]\n");
-  */
+  
     printf("Generating predict-update test output ... "); 
     fflush(stdout);
     test_predict_update("./data/out_compact_test.txt", "./data/out_se.txt");  

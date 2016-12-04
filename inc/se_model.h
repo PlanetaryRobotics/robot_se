@@ -27,6 +27,7 @@ typedef enum
 #include "tiny_ekf.h"
 
 ekf_t* se_init();
+void se_deinit();
 void se_predict(double delta, int idx);
 void se_update(double* msmt, int* msmt_up, int num_up, double* msmt_covariance,  int idx);
 
